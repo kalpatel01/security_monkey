@@ -254,6 +254,13 @@ class Auditor(object):
         else:
             return False
 
+    def applies_to_account(self, account):
+        """
+        Placeholder for custom auditors which may only want to run against
+        certain types of accounts
+        """
+        return True
+
     def _create_auditor_settings(self):
         """
         Checks to see if an AuditorSettings entry exists for each issue.

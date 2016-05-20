@@ -23,7 +23,7 @@
 from security_monkey.tests import SecurityMonkeyTestCase
 from security_monkey.watcher import watcher_registry
 from security_monkey.auditor import auditor_registry
-from security_monkey.datastore import Account
+from security_monkey.datastore import Account, AccountType
 from security_monkey.tests.db_mock import MockAccountQuery, MockDBSession
 from security_monkey.scheduler import find_changes
 
@@ -57,6 +57,9 @@ def save_issues(self):
     pass
 
 
+def applies_to_account(self, account):
+    return True
+
 mock_query = MockAccountQuery()
 mock_db_session = MockDBSession()
 
@@ -66,6 +69,7 @@ test_account.notes = "TEST ACCOUNT"
 test_account.s3_name = "TEST_ACCOUNT"
 test_account.number = "012345678910"
 test_account.role_name = "TEST_ACCOUNT"
+test_account.account_type = AccountType(name='AWS')
 test_account.third_party = False
 test_account.active = True
 mock_query.add_account(test_account)
@@ -76,6 +80,7 @@ test_account2.notes = "TEST ACCOUNT2"
 test_account2.s3_name = "TEST_ACCOUNT2"
 test_account2.number = "123123123123"
 test_account2.role_name = "TEST_ACCOUNT"
+test_account2.account_type = AccountType(name='AWS')
 test_account2.third_party = False
 test_account2.active = True
 mock_query.add_account(test_account2)
@@ -99,8 +104,15 @@ test_watcher_registry = {}
 test_auditor_registry = {}
 for key in watcher_registry:
     base_watcher_class = watcher_registry[key]
-    test_watcher_registry[key] = type(base_watcher_class.__name__, (MockWatcher,), {
-                                      'slurp': slurp, 'save': save, 'index': base_watcher_class.index})
+    test_watcher_registry[key] = type(
+        base_watcher_class.__name__, (MockWatcher,),
+        {
+            'slurp': slurp,
+            'save': save,
+            'index': base_watcher_class.index,
+            'account_type': base_watcher_class.account_type
+        }
+    )
 
 for key in auditor_registry:
     auditor_list = []
@@ -110,7 +122,8 @@ for key in auditor_registry:
             {
                 'audit_all_objects': audit_all_objects,
                 'save_issues': save_issues,
-                'index': base_auditor_class.index
+                'index': base_auditor_class.index,
+                'applies_to_account': applies_to_account
             }
         )
         auditor_list.append(auditor)
@@ -141,7 +154,7 @@ class SchedulerTestCase(SecurityMonkeyTestCase):
             for au in orig_auditor_registry[orig_watcher_registry[key].index]:
                 expected_auditor_count = expected_auditor_count + 1
                 au_list = RUNTIME_AUDITORS[au.__name__]
-                self.assertEqual(first=len(au_list), second=1,
+                self.assertEqual(first=len(au_list), second=2,
                                  msg="Auditor {} should run once but ran {} time(s)"
                                  .format(au.__name__, len(au_list)))
 
